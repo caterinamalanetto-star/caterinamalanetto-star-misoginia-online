@@ -36,10 +36,10 @@
   </figure>
   <p class="r-key"><span><i class="sw sw--ring" style="border-color:var(--grey)"></i>2014</span><span><i class="sw" style="background:var(--blue);border-radius:50%"></i>2025</span></p>
 
-  <p class="r-note">I dati 2025 sono i primi risultati dell'indagine e riguardano solo le cittadine italiane (circa 17.500 interviste telefoniche): quelli sulle donne straniere sono raccolti a parte. La violenza sessuale comprende stupri, tentati stupri, molestie fisiche e altre forme di costrizione. I dati non dicono dove sia avvenuta la violenza né indicano un legame con gli ambienti digitali.</p>
+  <p class="r-note">I dati per età riguardano le cittadine italiane (primi risultati 2025, circa 17.500 interviste telefoniche), l'unico gruppo con il dettaglio completo e il confronto con il 2014. Con le straniere, secondo il Rapporto Bes 2026, la violenza sessuale tra le 16-24enni è al 29,7% (16,7% nel 2014). La violenza sessuale comprende stupri, tentati stupri, molestie fisiche e altre forme di costrizione. I dati non dicono dove sia avvenuta la violenza né indicano un legame con gli ambienti digitali.</p>
 
   <footer class="r-foot">
-    <span>Fonte: Istat, «La violenza contro le donne dentro e fuori la famiglia. Primi risultati 2025», prospetto 5</span>
+    <span>Fonte: Istat, «La violenza contro le donne dentro e fuori la famiglia. Primi risultati 2025», prospetto 5; Rapporto Bes 2026</span>
     <span>Elaborazione Radar – QN</span>
   </footer>
 </main>
@@ -64,7 +64,7 @@
 
     // big number: violenza sessuale, 16-24 anni, 2025
     var bv = young["Sessuale"];
-    d3.select("#big-label").text("delle ragazze di " + young.k + " anni ha subito violenza sessuale negli ultimi cinque anni. Nel 2014 era il " + f1(bv[0]) + ".");
+    d3.select("#big-label").text("delle ragazze italiane di " + young.k + " anni ha subito violenza sessuale negli ultimi cinque anni. Nel 2014 era il " + f1(bv[0]) + ".");
     d3.select("#big-num").text(fmt(R.reduced ? bv[1] : 0, 1));
     R.onFirstView(document.getElementById("big"), function () {
       R.countUp(d3.select("#big-num"), bv[1], function (v) { return fmt(v, 1); }, R.reduced ? "static" : "play");
