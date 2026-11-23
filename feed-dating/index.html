@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stessa parola, due feed diversi – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .r-toggle { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 22px 0 6px; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; }
+  .r-toggle button { font: 500 13px/1 var(--sans); color: var(--ink-2); background: none; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+  .r-toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .r-toggle button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .feeds { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 18px; }
+  @media (max-width: 519px) { .feeds { grid-template-columns: 1fr; gap: 26px; } }
+  .feed { position: relative; }
+  .feed__head { font-size: 14px; font-weight: 600; margin: 0; }
+  .feed__num { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 10px; }
+  .feed__pct { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .feed__lab { font-size: 13px; color: var(--ink-2); line-height: 1.3; }
+  .cell { stroke: var(--bg); stroke-width: 2px; transition: opacity 180ms ease; cursor: pointer; }
+  .cell.is-dimmed { opacity: 0.22; }
+  .r-key button { all: unset; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .r-key button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Stessa parola, due feed diversi</h1>
+    <p class="r-sub">I video che Instagram ha proposto ai due profili «attivi» dell'esperimento ActionAid, uno con nome maschile e uno femminile, dopo la stessa ricerca e tre giorni dopo l'ultima ricerca. Ogni quadrato è un video</p>
+  </header>
+
+  <div class="r-toggle" role="group" aria-label="Scegli il momento" id="tg"></div>
+  <p class="r-chart__sub" id="sub"></p>
+
+  <div class="feeds" id="feeds"></div>
+  <p class="r-key" id="key"></p>
+
+  <p class="r-note">Studio pilota con un solo profilo per condizione. «Altri contenuti tossici»: mascolinità alfa sul profilo maschile, femminilità aspirazionale su quello femminile. «Apertamente ostili»: misoginia, antifemminismo e altri contenuti che attaccano donne o minoranze. Sulla sessione «dating» del profilo maschile i contenuti non tossici sono riuniti in «Altri contenuti».</p>
+
+  <footer class="r-foot">
+    <span>Fonte: ActionAid, «Suggerito per te» (2026), figura 17 e tabella 8</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var CATS = [
+    { k: "Apertamente ostili", c: "var(--red)" },
+    { k: "Altri contenuti tossici", c: "var(--blue)" },
+    { k: "Casa e cura", c: "var(--grey-3)" },
+    { k: "Altri contenuti", c: "var(--grey-5)" }
+  ];
+  var SUB = {
+    0: "Sessione 6, 18 settembre: entrambi i profili cercano «dating». 50 video ciascuno",
+    1: "Sessione finale, 24 settembre: nessuna ricerca, solo il feed. 30 video ciascuno"
+  };
+  R.loadCSV("../data/feed-composizione.csv").then(function (rows) {
+    var moments = [];
+    rows.forEach(function (r) {
+      var m = moments.find(function (q) { return q.k === r["Momento"]; });
+      if (!m) { m = { k: r["Momento"], profiles: [] }; moments.push(m); }
+      var p = m.profiles.find(function (q) { return q.k === r["Profilo"]; });
+      if (!p) { p = { k: r["Profilo"], parts: [] }; m.profiles.push(p); }
+      p.parts.push({ cat: r["Categoria"], n: R.num(r["Video"]), nota: r["Nota"] });
+    });
+    moments.forEach(function (m) { m.profiles.forEach(function (p) {
+      p.parts.sort(function (a, b) { return CATS.findIndex(function (c) { return c.k === a.cat; }) - CATS.findIndex(function (c) { return c.k === b.cat; }); });
+      p.total = d3.sum(p.parts, function (d) { return d.n; });
+      p.tox = d3.sum(p.parts.filter(function (d) { return d.cat === "Apertamente ostili" || d.cat === "Altri contenuti tossici"; }), function (d) { return d.n; });
+      p.cells = [];
+      p.parts.forEach(function (part) { for (var i = 0; i < part.n; i++) p.cells.push(part); });
+    }); });
+    var sel = 0, hot = null;
+    var colOf = function (cat) { return CATS.find(function (c) { return c.k === cat; }).c; };
+
+    var tg = d3.select("#tg").selectAll("button").data(moments).join("button").attr("type", "button")
+      .text(function (d, i) { return i === 0 ? "Ricerca «dating»" : "Tre giorni dopo"; })
+      .on("click", function (ev, d) { sel = moments.indexOf(d); render("play"); });
+
+    var key = d3.select("#key").selectAll("button").data(CATS).join("button").attr("type", "button")
+      .html(function (d) { return '<i class="sw" style="background:' + d.c + '"></i>' + d.k; })
+      .on("click", function (ev, d) { hot = hot === d.k ? null : d.k; highlight(); });
+
+    var host = document.getElementById("feeds");
+    var panels = d3.select(host).selectAll(".feed").data([0, 1]).join("div").attr("class", "feed");
+    panels.append("p").attr("class", "feed__head");
+    var num = panels.append("div").attr("class", "feed__num");
+    num.append("span").attr("class", "feed__pct");
+    num.append("span").attr("class", "feed__lab").text("di contenuti tossici");
+    var tips = panels.nodes().map(function (n) { return R.tooltip(n); });
+    R.dismissOutside(host, function () { tips.forEach(function (t) { t.hide(); }); hot = null; highlight(); });
+
+    function highlight() {
+      d3.select(host).selectAll(".cell").classed("is-dimmed", function (d) { return hot && d.cat !== hot; });
+      key.style("opacity", function (d) { return hot && d.k !== hot ? 0.45 : 1; });
+    }
+
+    function render(phase) {
+      var m = moments[sel];
+      tg.attr("aria-pressed", function (d, i) { return i === sel ? "true" : "false"; });
+      d3.select("#sub").text(SUB[sel]);
+      panels.each(function (pi) {
+        var p = m.profiles[pi], panel = d3.select(this), tip = tips[pi];
+        panel.select(".feed__head").text(p.k === "Maschile attivo" ? "Profilo con nome maschile" : "Profilo con nome femminile");
+        var pctEl = panel.select(".feed__pct").style("color", p.tox / p.total > 0.5 ? "var(--red)" : null);
+        R.countUp(pctEl, p.tox / p.total * 100, function (v) { return fmt(v, 0) + "%"; }, phase === "pre" ? "pre" : phase);
+        var W = Math.floor(this.getBoundingClientRect().width);
+        var cols = 10, gap = 0, size = Math.min(34, Math.floor(W / cols));
+        var rowsN = Math.ceil(p.total / cols), H = rowsN * size;
+        panel.select("svg").remove();
+        var svg = panel.insert("svg", ".r-tip").attr("width", cols * size).attr("height", H).attr("role", "img")
+          .attr("aria-label", p.k + ", " + m.k + ": " + p.parts.map(function (d) { return d.cat + " " + d.n + " video su " + p.total; }).join(", ") + ".");
+        svg.append("title").text("I " + p.total + " video proposti al profilo " + (p.k === "Maschile attivo" ? "maschile" : "femminile"));
+        var cells = svg.selectAll("rect").data(p.cells).join("rect").attr("class", "cell")
+          .attr("x", function (d, i) { return (i % cols) * size; }).attr("y", function (d, i) { return Math.floor(i / cols) * size; })
+          .attr("width", size).attr("height", size).attr("rx", 2)
+          .style("fill", function (d) { return colOf(d.cat); });
+        if (phase === "play" && !R.reduced) {
+          cells.style("opacity", 0).transition().delay(function (d, i) { return i * 12; }).duration(200).style("opacity", null);
+        } else if (phase === "pre") cells.style("opacity", 0);
+        cells.on("pointerenter", function (ev, d) {
+          hot = d.cat; highlight();
+          var i = p.cells.indexOf(d);
+          var off = svg.node().getBoundingClientRect().top - panel.node().getBoundingClientRect().top;
+          tip.show(R.tipHTML({ title: d.cat, value: d.n + " video", unit: "su " + p.total, note: d.nota }), (i % cols) * size + size / 2, Math.floor(i / cols) * size + off);
+        }).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); hot = null; highlight(); } });
+      });
+      highlight();
+      R.scheduleHeight();
+    }
+    render("pre");
+    var played = false;
+    R.onFirstView(host, function () { played = true; render("play"); });
+    var lastW = host.getBoundingClientRect().width;
+    window.addEventListener("resize", function () {
+      var w = host.getBoundingClientRect().width;
+      if (w !== lastW) { lastW = w; render(played ? "static" : "pre"); }
+    });
+  }).catch(function (e) { R.fail("#feeds", e); });
+})();
+</script>
+</body>
+</html>

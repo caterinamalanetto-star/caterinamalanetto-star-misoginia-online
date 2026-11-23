@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Violenza sessuale per area geografica, 2014 e 2025 – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .r-toggle { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 4px 8px 10px 0; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; }
+  .r-toggle button { font: 500 13px/1 var(--sans); color: var(--ink-2); background: none; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+  .r-toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .r-toggle button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .map-wrap { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 559px) { .map-wrap { grid-template-columns: 1fr; gap: 8px; } }
+  .reg { stroke: var(--bg); stroke-width: 0.6; transition: opacity 180ms ease; cursor: pointer; }
+  .reg.is-dimmed { opacity: 0.3; }
+  .area-label { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+  .area-val { font-size: 12px; font-variant-numeric: tabular-nums; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+  .scale text { font-size: 11px; fill: var(--ink-2); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Violenza sessuale, l'aumento è al Nord&#8209;est e al Centro</h1>
+    <p class="r-sub">Donne italiane di 16-70 anni che hanno subito violenza sessuale nei cinque anni prima dell'intervista, per area geografica. Indagini Istat 2014 e 2025</p>
+  </header>
+
+  <div>
+    <div class="r-toggle" role="group" aria-label="Che cosa mostrare" id="tg-m"></div>
+    <div class="r-toggle" role="group" aria-label="Tipo di violenza" id="tg-k"></div>
+  </div>
+  <p class="r-chart__sub" id="sub"></p>
+
+  <div class="map-wrap">
+    <figure class="r-chart" id="map" style="margin:0"></figure>
+    <figure class="r-chart" id="bars" style="margin:0"></figure>
+  </div>
+
+  <p class="r-note">I dati 2025 sono i primi risultati dell'indagine e riguardano solo le cittadine italiane. Per area geografica il campione è più piccolo che a livello nazionale: differenze di pochi decimali vanno lette con cautela. Le regioni sono colorate con il valore della loro area: l'Istat non pubblica il dato per singola regione.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Istat, «La violenza contro le donne dentro e fuori la famiglia. Primi risultati 2025», prospetto 5. Confini: Openpolis</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var MODES = [{ k: "var", lab: "Variazione dal 2014" }, { k: "lev", lab: "Livello 2025" }];
+  var KINDS = [{ k: "Sessuale", lab: "Sessuale" }, { k: "Fisica o sessuale", lab: "Fisica o sessuale" }];
+  var mode = MODES[0], kind = KINDS[0], hot = null;
+
+  Promise.all([d3.json("../data/regioni-italia.geojson"), R.loadCSV("../data/violenza-ripartizioni.csv")]).then(function (res) {
+    var geo = res[0];
+    var areas = res[1].map(function (r) {
+      var o = { k: r["Ripartizione"] };
+      KINDS.forEach(function (K) { o[K.k] = [R.num(r[K.k + " 2014"]), R.num(r[K.k + " 2025"])]; });
+      return o;
+    });
+    var italia = areas.find(function (a) { return a.k === "Italia"; });
+    var parts = areas.filter(function (a) { return a !== italia; });
+    var byName = {}; parts.forEach(function (a) { byName[a.k] = a; });
+    var valOf = function (a) { var v = a[kind.k]; return mode.k === "var" ? v[1] - v[0] : v[1]; };
+    var fmtV = function (v) { return mode.k === "var" ? (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), 1) : fmt(v, 1) + "%"; };
+
+    function color(v) {
+      if (mode.k === "var") {
+        var s = d3.scaleThreshold().domain([-1, -0.25, 0.25, 1, 1.75]).range(["var(--blue-2)", "var(--blue-4)", "var(--grey-5)", "var(--red-5)", "var(--red-4)", "var(--red-3)"]);
+        return s(v);
+      }
+      var ext = d3.extent(parts, function (a) { return a[kind.k][1]; });
+      var q = d3.scaleQuantize().domain(ext).range(["var(--blue-5)", "var(--blue-4)", "var(--blue-3)", "var(--blue-2)", "var(--blue-1)"]);
+      return q(v);
+    }
+
+    var tgm = d3.select("#tg-m").selectAll("button").data(MODES).join("button").attr("type", "button").text(function (d) { return d.lab; })
+      .on("click", function (ev, d) { mode = d; update("play"); });
+    var tgk = d3.select("#tg-k").selectAll("button").data(KINDS).join("button").attr("type", "button").text(function (d) { return d.lab; })
+      .on("click", function (ev, d) { kind = d; update("play"); });
+
+    var mapHost = document.getElementById("map"), barHost = document.getElementById("bars");
+    var tip = R.tooltip(mapHost), tip2 = R.tooltip(barHost);
+    R.dismissOutside(document.querySelector(".map-wrap"), function () { tip.hide(); tip2.hide(); hot = null; dim(); });
+    var drawMap, drawBars;
+
+    function tipFor(a) {
+      var v = a[kind.k], d = v[1] - v[0];
+      return R.tipHTML({ title: a.k, value: fmt(v[1], 1) + "%", unit: "nel 2025", rows: [["Nel 2014", fmt(v[0], 1) + "%"], ["Variazione", (d > 0 ? "+" : "") + fmt(d, 1) + " punti"], ["Media Italia 2025", fmt(italia[kind.k][1], 1) + "%"]], note: "Violenza " + kind.lab.toLowerCase() + ", ultimi cinque anni" });
+    }
+    function dim() {
+      d3.select(mapHost).selectAll(".reg").classed("is-dimmed", function (f) { return hot && f.properties.ripartizione !== hot; });
+      d3.select(barHost).selectAll(".mark").classed("is-dimmed", function (a) { return hot && a.k !== hot; });
+    }
+
+    R.responsive(mapHost, function (W, phase) {
+      drawMap = function (ph) {
+        var H = Math.round(W * 1.18);
+        var proj = d3.geoConicConformal().rotate([-12.5, 0]).parallels([38, 46]).fitExtent([[6, 6], [W - 6, H - 6]], geo);
+        var path = d3.geoPath(proj);
+        d3.select(mapHost).select("svg").remove();
+        var svg = d3.select(mapHost).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+          .attr("aria-label", "Mappa: violenza " + kind.lab.toLowerCase() + " per area, " + (mode.k === "var" ? "variazione in punti dal 2014 al 2025: " : "livello 2025: ") + parts.map(function (a) { return a.k + " " + fmtV(valOf(a)); }).join(", ") + ".");
+        var regs = svg.append("g").selectAll("path").data(geo.features).join("path").attr("class", "reg").attr("d", path);
+        var fill = function (f) { return color(valOf(byName[f.properties.ripartizione])); };
+        if (ph === "play" && !R.reduced) regs.style("fill", "var(--grey-5)").transition().duration(R.DUR).ease(R.EASE).style("fill", fill);
+        else if (ph === "pre") regs.style("fill", "var(--grey-5)");
+        else regs.style("fill", fill);
+        regs.on("pointerenter pointermove", function (ev, f) {
+          var a = byName[f.properties.ripartizione]; hot = a.k; dim();
+          var p = d3.pointer(ev, mapHost); tip.show(tipFor(a), p[0], p[1]);
+        }).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); hot = null; dim(); } });
+        // etichette al baricentro di ogni area
+        var lab = svg.append("g");
+        parts.forEach(function (a) {
+          var fs = geo.features.filter(function (f) { return f.properties.ripartizione === a.k; });
+          var c = path.centroid({ type: "FeatureCollection", features: fs });
+          if (a.k === "Isole") c = path.centroid(fs.find(function (f) { return f.properties.regione === "Sicilia"; }));
+          if (a.k === "Sud") c = [c[0] + W * 0.02, c[1] - W * 0.02];
+          lab.append("text").attr("class", "area-label").attr("x", c[0]).attr("y", c[1] - 4).attr("text-anchor", "middle").text(a.k);
+          lab.append("text").attr("class", "area-val").attr("x", c[0]).attr("y", c[1] + 11).attr("text-anchor", "middle").text(fmtV(valOf(a)) + (mode.k === "var" ? " punti" : ""));
+        });
+        R.enter(lab, ph, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); });
+        // legenda
+        var lg = svg.append("g").attr("class", "scale").attr("transform", "translate(" + (W - 150) + ",14)");
+        var steps = mode.k === "var" ? [["−1", "var(--blue-2)"], ["", "var(--blue-4)"], ["0", "var(--grey-5)"], ["", "var(--red-5)"], ["+1", "var(--red-4)"], ["+1,75", "var(--red-3)"]]
+          : d3.range(5).map(function (i) { return ["", ["var(--blue-5)", "var(--blue-4)", "var(--blue-3)", "var(--blue-2)", "var(--blue-1)"][i]]; });
+        lg.selectAll("rect").data(steps).join("rect").attr("x", function (d, i) { return i * 22; }).attr("width", 21).attr("height", 8).style("fill", function (d) { return d[1]; });
+        if (mode.k === "var") lg.selectAll("text").data(steps).join("text").attr("x", function (d, i) { return i * 22; }).attr("y", 22).text(function (d) { return d[0]; });
+        else { var ext = d3.extent(parts, function (a) { return a[kind.k][1]; }); lg.append("text").attr("y", 22).text(fmt(ext[0], 1) + "%"); lg.append("text").attr("x", 110).attr("y", 22).attr("text-anchor", "end").text(fmt(ext[1], 1) + "%"); }
+        lg.append("text").attr("y", -4).text(mode.k === "var" ? "punti percentuali" : "% di donne");
+      };
+      drawMap(phase);
+    });
+
+    R.responsive(barHost, function (W, phase) {
+      drawBars = function (ph) {
+        var data = parts.slice().sort(function (a, b) { return valOf(b) - valOf(a); }).concat([italia]);
+        var narrow = R.isNarrow(W), labW = 86, right = 64, row = 34, bh = 16, top = 8;
+        var w = W - labW - right;
+        var vals = data.map(valOf), lo = Math.min(0, d3.min(vals)), hi = Math.max(0, d3.max(vals));
+        var x = d3.scaleLinear().domain(mode.k === "var" ? [Math.min(lo, -1), Math.max(hi, 1)] : [0, hi]).range([0, w]);
+        var H = top + data.length * row + 10;
+        d3.select(barHost).select("svg").remove();
+        var svg = d3.select(barHost).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+          .attr("aria-label", "Classifica delle aree: " + data.map(function (a) { return a.k + " " + fmtV(valOf(a)); }).join(", ") + ".");
+        var g = svg.append("g").attr("transform", "translate(" + labW + "," + top + ")");
+        var y = function (i) { return i * row + (i === data.length - 1 ? 8 : 0); };
+        g.append("line").attr("class", "baseline").attr("x1", Math.round(x(0)) + 0.5).attr("x2", Math.round(x(0)) + 0.5).attr("y1", -4).attr("y2", H - top - 4);
+        svg.append("g").selectAll("text").data(data).join("text").attr("class", "tick-label").attr("x", labW - 10).attr("text-anchor", "end")
+          .attr("y", function (d, i) { return top + y(i) + bh / 2; }).attr("dy", "0.35em")
+          .style("font-weight", function (d) { return d === italia ? 600 : null; }).style("fill", function (d) { return d === italia ? "var(--ink)" : null; }).text(function (d) { return d.k; });
+        var bars = g.selectAll("path.b").data(data).join("path").attr("class", "b mark")
+          .style("fill", function (d) { return d === italia ? "var(--grey-2)" : color(valOf(d)); })
+          .style("stroke", function (d) { return d !== italia && color(valOf(d)) === "var(--grey-5)" ? "var(--grey-4)" : null; });
+        function bp(d, i, t) {
+          var v = valOf(d) * t, x0 = x(Math.min(0, v)), x1 = x(Math.max(0, v));
+          return v >= 0 ? R.barPathH(x0, y(i), Math.max(1, x1 - x0), bh, 2) : "M" + x1 + "," + y(i) + "H" + (x0 + 2) + "Q" + x0 + "," + y(i) + " " + x0 + "," + (y(i) + 2) + "V" + (y(i) + bh - 2) + "Q" + x0 + "," + (y(i) + bh) + " " + (x0 + 2) + "," + (y(i) + bh) + "H" + x1 + "Z";
+        }
+        if (ph === "play" && !R.reduced) bars.attr("d", function (d, i) { return bp(d, i, 0); }).transition().duration(R.DUR).ease(R.EASE).attrTween("d", function (d) { var i = data.indexOf(d); return function (t) { return bp(d, i, t); }; });
+        else bars.attr("d", function (d, i) { return bp(d, i, ph === "pre" ? 0 : 1); });
+        g.selectAll("text.v").data(data).join("text").attr("class", "v val-label mark")
+          .attr("x", function (d) { var v = valOf(d); return v >= 0 ? x(v) + 6 : x(0) + 6; }).attr("y", function (d, i) { return y(i) + bh / 2; }).attr("dy", "0.35em")
+          .text(function (d) { return fmtV(valOf(d)); });
+        g.selectAll("rect.hit").data(data).join("rect").attr("class", "hit").attr("x", -labW).attr("width", W).attr("y", function (d, i) { return y(i) - 8; }).attr("height", row)
+          .on("pointerenter", function (ev, d) { hot = d === italia ? null : d.k; dim(); tip2.show(tipFor(d), Math.min(W - 20, labW + x(Math.max(0, valOf(d))) + 30), y(data.indexOf(d)) + top); })
+          .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip2.hide(); hot = null; dim(); } });
+      };
+      drawBars(phase);
+    });
+
+    function update(ph) {
+      tgm.attr("aria-pressed", function (d) { return d === mode ? "true" : "false"; });
+      tgk.attr("aria-pressed", function (d) { return d === kind ? "true" : "false"; });
+      d3.select("#sub").text(mode.k === "var"
+        ? "Differenza in punti percentuali tra il 2025 e il 2014. In rosso dove la violenza è aumentata, in blu dove è diminuita"
+        : "% di donne della stessa area che hanno subito violenza nei cinque anni prima dell'intervista, 2025");
+      if (ph !== "init") { if (drawMap) drawMap(ph); if (drawBars) drawBars(ph); }
+      R.scheduleHeight();
+    }
+    update("init");
+  }).catch(function (e) { R.fail("#map", e); });
+})();
+</script>
+</body>
+</html>

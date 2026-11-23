@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prova a indovinare – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .q { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--rule); position: relative; }
+  .q:first-of-type { border-top: 0; padding-top: 0; }
+  .q__n { font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: .04em; margin: 0 0 4px; }
+  .q__t { font-size: 17px; font-weight: 600; line-height: 1.35; margin: 0 0 14px; }
+  .q__row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .q__val { font-size: 30px; font-weight: 700; min-width: 3.6em; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .q__val small { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+  input[type=range] { -webkit-appearance: none; appearance: none; flex: 1 1 220px; height: 28px; background: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  input[type=range]::-moz-range-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; background: var(--ink); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--ink); }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 3px solid var(--bg); }
+  input[type=range]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  input[type=range]:disabled { cursor: default; opacity: .6; }
+  .q__btn { font: 600 14px/1 var(--sans); color: var(--bg); background: var(--ink); border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer; }
+  .q__btn:disabled { opacity: .35; cursor: default; }
+  .q__btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .q__res { display: none; margin-top: 14px; }
+  .q.is-done .q__res { display: block; }
+  .q__ans { font-size: 15px; line-height: 1.45; margin: 6px 0 4px; }
+  .q__ans b { font-weight: 700; }
+  .q__src { font-size: 12px; color: var(--ink-2); margin: 0; }
+  .q__res svg text { font-size: 12px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Prova a indovinare</h1>
+    <p class="r-sub">Tre numeri su ragazze, ragazzi e violenza, tra feed e vita reale. Sposta il cursore sulla tua stima, poi scopri il dato vero</p>
+  </header>
+
+  <div id="qs"></div>
+
+  <footer class="r-foot">
+    <span>Fonti: Istat; ActionAid, «Suggerito per te» (2026)</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  R.loadCSV("../data/indovina.csv").then(function (rows) {
+    var qs = rows.map(function (r) {
+      var un = r["Unità"].trim(); un = un === "%" ? "%" : " " + un;
+      return { t: r["Domanda"], min: R.num(r["Minimo"]), max: R.num(r["Massimo"]), step: R.num(r["Passo"]), unit: un,
+        v: R.num(r["Valore"]), dec: R.num(r["Decimali"]), ans: r["Risposta"], src: r["Fonte"] };
+    });
+    var cards = d3.select("#qs").selectAll(".q").data(qs).join("section").attr("class", "q");
+    cards.append("p").attr("class", "q__n").text(function (d, i) { return "DOMANDA " + (i + 1) + " DI " + qs.length; });
+    cards.append("p").attr("class", "q__t").attr("id", function (d, i) { return "qt" + i; }).text(function (d) { return d.t; });
+    var row = cards.append("div").attr("class", "q__row");
+    var val = row.append("div").attr("class", "q__val").attr("aria-live", "polite");
+    var input = row.append("input").attr("type", "range")
+      .attr("min", function (d) { return d.min; }).attr("max", function (d) { return d.max; }).attr("step", function (d) { return d.step; })
+      .attr("aria-labelledby", function (d, i) { return "qt" + i; })
+      .property("value", function (d) { return Math.round((d.min + d.max) / 2); });
+    var btn = row.append("button").attr("type", "button").attr("class", "q__btn").text("Scopri il dato");
+    var res = cards.append("div").attr("class", "q__res");
+    var chart = res.append("div").attr("class", "q__chart");
+    res.append("p").attr("class", "q__ans");
+    res.append("p").attr("class", "q__src").text(function (d) { return "Fonte: " + d.src; });
+
+    function unitHTML(d) { return d.unit === "%" ? "<small>%</small>" : "<small style=\"margin-left:6px\">" + d.unit.trim() + "</small>"; }
+    function showVal(card, d) {
+      var g = +card.select("input").property("value");
+      card.select(".q__val").html(fmt(g, 0) + unitHTML(d));
+    }
+    cards.each(function (d) { var c = d3.select(this); showVal(c, d); });
+    input.on("input", function (ev, d) { showVal(d3.select(this.closest(".q")), d); });
+
+    btn.on("click", function (ev, d) {
+      var card = d3.select(this.closest(".q"));
+      d.guess = +card.select("input").property("value");
+      card.classed("is-done", true);
+      card.select("input").attr("disabled", true);
+      d3.select(this).attr("disabled", true).text("Fatto");
+      var diff = d.guess - d.v, u = d.unit.trim() === "%" ? " punti" : d.unit;
+      var verdict = Math.abs(diff) <= (d.max - d.min) * 0.05 ? "Molto vicino." : diff < 0 ? "Hai sottostimato di " + fmt(Math.abs(diff), d.dec) + u + "." : "Hai sovrastimato di " + fmt(Math.abs(diff), d.dec) + u + ".";
+      card.select(".q__ans").html("<b>" + verdict + "</b> " + d.ans);
+      draw(card, d, "play");
+      R.scheduleHeight();
+    });
+
+    function draw(card, d, phase) {
+      var host = card.select(".q__chart").node();
+      var W = Math.floor(host.getBoundingClientRect().width) || Math.floor(card.node().getBoundingClientRect().width);
+      var m = { l: 4, r: 4 }, w = W - m.l - m.r, H = 74, y = 40;
+      var x = d3.scaleLinear().domain([d.min, d.max]).range([0, w]);
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).append("svg").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "La tua stima: " + fmt(d.guess, 0) + d.unit + ". Il dato reale: " + fmt(d.v, d.dec) + d.unit + ".");
+      var g = svg.append("g").attr("transform", "translate(" + m.l + ",0)");
+      g.append("line").attr("x1", 0).attr("x2", w).attr("y1", y).attr("y2", y).style("stroke", "var(--rule)").style("stroke-width", 6).style("stroke-linecap", "round");
+      var a = Math.min(d.guess, d.v), b = Math.max(d.guess, d.v);
+      var gap = g.append("line").attr("y1", y).attr("y2", y).attr("x1", x(d.guess)).attr("x2", x(d.guess)).style("stroke", "var(--red-4)").style("stroke-width", 6);
+      g.append("circle").attr("cx", x(d.guess)).attr("cy", y).attr("r", 7).style("fill", "var(--bg)").style("stroke", "var(--ink-2)").style("stroke-width", 2);
+      var real = g.append("circle").attr("cy", y).attr("r", 8).style("fill", "var(--red)").attr("cx", x(d.guess));
+      var near = Math.abs(x(d.guess) - x(d.v)) < 90;
+      var anchor = function (px) { return px < 40 ? "start" : px > w - 40 ? "end" : "middle"; };
+      g.append("text").attr("x", x(d.guess)).attr("y", y + 26).attr("text-anchor", anchor(x(d.guess)))
+        .style("fill", "var(--ink-2)").text("Tu: " + fmt(d.guess, 0) + d.unit);
+      var lab = g.append("text").attr("x", x(d.v)).attr("y", y - 16).attr("text-anchor", anchor(x(d.v)))
+        .style("fill", "var(--red)").style("font-weight", 700).text("Dato reale: " + fmt(d.v, d.dec) + d.unit);
+      if (phase === "play" && !R.reduced) {
+        lab.style("opacity", 0).transition().delay(R.DUR).duration(200).style("opacity", 1);
+        real.transition().duration(R.DUR).ease(R.EASE).attr("cx", x(d.v));
+        gap.transition().duration(R.DUR).ease(R.EASE).attr("x1", x(a)).attr("x2", x(b));
+      } else { real.attr("cx", x(d.v)); gap.attr("x1", x(a)).attr("x2", x(b)); }
+    }
+    var lastW = window.innerWidth;
+    window.addEventListener("resize", function () {
+      if (window.innerWidth === lastW) return; lastW = window.innerWidth;
+      cards.filter(".is-done").each(function (d) { draw(d3.select(this), d, "static"); });
+    });
+    R.scheduleHeight();
+  }).catch(function (e) { R.fail("#qs", e); });
+})();
+</script>
+</body>
+</html>
