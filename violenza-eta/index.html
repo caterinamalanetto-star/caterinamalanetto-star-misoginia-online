@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Violenza sulle donne per età, 2014 e 2025 – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .r-toggle { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 4px 0 12px; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; }
+  .r-toggle button { font: 500 13px/1 var(--sans); color: var(--ink-2); background: none; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+  .r-toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .r-toggle button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .yr-label { font-size: 12px; fill: var(--ink-2); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Violenza sessuale, tre ragazze su dieci tra i 16 e i 24 anni</h1>
+    <p class="r-sub">Donne italiane di 16-70 anni che hanno subito violenza da un uomo nei cinque anni prima dell'intervista, per età. Indagini Istat sulla sicurezza delle donne, 2014 e 2025</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span class="r-big__num"><span id="big-num">&nbsp;</span><span class="r-big__unit">%</span></span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <figure class="r-chart" id="chart">
+    <div class="r-toggle" role="group" aria-label="Tipo di violenza" id="tg"></div>
+    <p class="r-chart__sub" id="sub"></p>
+  </figure>
+  <p class="r-key"><span><i class="sw sw--ring" style="border-color:var(--grey)"></i>2014</span><span><i class="sw" style="background:var(--blue);border-radius:50%"></i>2025</span></p>
+
+  <p class="r-note">I dati 2025 sono i primi risultati dell'indagine e riguardano solo le cittadine italiane (circa 17.500 interviste telefoniche): quelli sulle donne straniere sono raccolti a parte. La violenza sessuale comprende stupri, tentati stupri, molestie fisiche e altre forme di costrizione. I dati non dicono dove sia avvenuta la violenza né indicano un legame con gli ambienti digitali.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Istat, «La violenza contro le donne dentro e fuori la famiglia. Primi risultati 2025», prospetto 5</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt, f1 = function (v) { return fmt(v, 1) + "%"; };
+  var KINDS = [
+    { k: "Sessuale", lab: "Violenza sessuale", btn: "Sessuale" },
+    { k: "Fisica o sessuale", lab: "Violenza fisica o sessuale", btn: "Fisica o sessuale" },
+    { k: "Fisica", lab: "Violenza fisica", btn: "Fisica" }
+  ];
+  var sel = KINDS[0];
+
+  R.loadCSV("../data/violenza-eta-2014-2025.csv").then(function (rows) {
+    var data = rows.map(function (r) {
+      var o = { k: r["Età"], tot: /Totale/.test(r["Età"]) };
+      KINDS.forEach(function (K) { o[K.k] = [R.num(r[K.k + " 2014"]), R.num(r[K.k + " 2025"])]; });
+      return o;
+    });
+    var young = data[0];
+
+    // big number: violenza sessuale, 16-24 anni, 2025
+    var bv = young["Sessuale"];
+    d3.select("#big-label").text("delle ragazze di " + young.k + " anni ha subito violenza sessuale negli ultimi cinque anni. Nel 2014 era il " + f1(bv[0]) + ".");
+    d3.select("#big-num").text(fmt(R.reduced ? bv[1] : 0, 1));
+    R.onFirstView(document.getElementById("big"), function () {
+      R.countUp(d3.select("#big-num"), bv[1], function (v) { return fmt(v, 1); }, R.reduced ? "static" : "play");
+    });
+
+    var tg = d3.select("#tg").selectAll("button").data(KINDS).join("button").attr("type", "button")
+      .text(function (d) { return d.btn; }).on("click", function (ev, d) { sel = d; sync(); if (api.draw) api.draw("play2"); });
+    function sync() {
+      tg.attr("aria-pressed", function (d) { return d === sel ? "true" : "false"; });
+      d3.select("#sub").text("% di donne della stessa età. Il pallino vuoto è il 2014, quello pieno il 2025");
+    }
+    sync();
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host), api = {}, prev = null;
+    R.dismissOutside(host, function () { tip.hide(); });
+    R.responsive(host, function (W, phase) { api.draw = function (ph) { draw(W, ph); }; draw(W, phase); });
+
+    function draw(W, phase) {
+      var narrow = R.isNarrow(W);
+      var labW = narrow ? 76 : 110, right = 50;
+      var w = W - labW - right;
+      var max = d3.max(data, function (d) { return d3.max(KINDS, function (K) { return d3.max(d[K.k]); }); });
+      var x = d3.scaleLinear().domain([0, Math.ceil(max / 10) * 10]).range([0, w]);
+      var ticks = x.ticks(narrow ? 3 : 4);
+      var cur = function (d) { return d[sel.k]; };
+      var up = function (d) { return cur(d)[1] >= cur(d)[0]; };
+      // annotazione: la classe d'età con l'aumento più forte, calcolata dai dati
+      var ages = data.filter(function (d) { return !d.tot; });
+      var top1 = ages.reduce(function (a, b) { return (cur(b)[1] - cur(b)[0]) > (cur(a)[1] - cur(a)[0]) ? b : a; });
+      var iTop = data.indexOf(top1), dTop = cur(top1)[1] - cur(top1)[0];
+      var nUp = ages.filter(function (d) { return d !== top1 && up(d); }).length;
+      var txt = "Da " + f1(cur(top1)[0]) + " a " + f1(cur(top1)[1]) + ": " + (dTop >= 0 ? "+" : "") + fmt(dTop, 1) + " punti, la crescita più forte." +
+        (nUp === 0 ? " In tutte le altre età il dato cala" : nUp === 1 ? " Fra le altre età sale solo un'altra classe, e di poco" : "");
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("role", "img")
+        .attr("aria-label", sel.lab + " negli ultimi cinque anni per età, 2014 e 2025: " + data.map(function (d) { return d.k + " da " + f1(cur(d)[0]) + " a " + f1(cur(d)[1]); }).join("; ") + ".");
+      svg.append("title").text(sel.lab + " per età, confronto 2014-2025");
+      var g = svg.append("g").attr("transform", "translate(" + labW + ",0)");
+
+      // misuro l'annotazione prima di disporre le righe
+      var row = 36, top = 26, sepGap = 14;
+      var anno = g.append("g").attr("class", "anno mark");
+      var annoX = narrow ? -labW : x(cur(top1)[0]);
+      var at = anno.append("text").attr("x", annoX).attr("y", 0).text(txt);
+      R.wrap(at, narrow ? W - 4 : Math.min(300, w + right - annoX), 1.3);
+      var extra = (+at.attr("data-lines")) * 13 * 1.3 + 8;
+      var ti = data.findIndex(function (d) { return d.tot; });
+      var yOf = function (d) { var i = data.indexOf(d); return top + i * row + row / 2 + (i > iTop ? extra : 0) + (d.tot ? sepGap : 0); };
+      var H = top + data.length * row + extra + sepGap + 4;
+      svg.attr("height", H);
+      at.attr("transform", "translate(0," + (yOf(top1) + 26) + ")");
+
+      g.append("g").attr("class", "grid").selectAll("line").data(ticks).join("line")
+        .attr("x1", function (v) { return Math.round(x(v)) + 0.5; }).attr("x2", function (v) { return Math.round(x(v)) + 0.5; })
+        .attr("y1", top - 6).attr("y2", H);
+      g.append("g").selectAll("text").data(ticks).join("text").attr("class", "tick-label")
+        .attr("x", function (v) { return x(v); }).attr("y", top - 12).attr("text-anchor", "middle")
+        .text(function (v, i) { return fmt(v, 0) + (i === ticks.length - 1 ? "%" : ""); });
+      var sepY = Math.round(yOf(data[ti]) - row / 2 - sepGap / 2) + 0.5;
+      g.append("line").attr("x1", -labW).attr("x2", w + right).attr("y1", sepY).attr("y2", sepY).style("stroke", "var(--rule)");
+
+      svg.append("g").selectAll("text").data(data).join("text").attr("class", "tick-label")
+        .attr("x", labW - 12).attr("text-anchor", "end").attr("y", yOf).attr("dy", "0.35em")
+        .style("fill", function (d) { return d === top1 || d.tot ? "var(--ink)" : null; })
+        .style("font-weight", function (d) { return d === top1 || d.tot ? 600 : null; })
+        .text(function (d) { return d.tot ? (narrow ? "Totale" : d.k) : d.k + " anni"; });
+
+      var hot = function (d) { return d === top1; };
+      var col = function (d) { return hot(d) ? "var(--red)" : d.tot ? "var(--ink)" : "var(--blue)"; };
+      var rowsG = g.append("g").selectAll("g").data(data).join("g").attr("class", "mark")
+        .attr("transform", function (d) { return "translate(0," + yOf(d) + ")"; });
+      var conn = rowsG.append("line").style("stroke", function (d) { return hot(d) ? "var(--red-4)" : "var(--grey-4)"; }).style("stroke-width", 2);
+      var c14 = rowsG.append("circle").attr("r", 5).style("fill", "var(--bg)").style("stroke", "var(--grey)").style("stroke-width", 2);
+      var c25 = rowsG.append("circle").attr("r", 6).style("fill", col);
+      var l14 = rowsG.append("text").attr("class", "val-label val-label--muted").attr("dy", "0.35em");
+      var l25 = rowsG.append("text").attr("class", "val-label").attr("dy", "0.35em").style("fill", function (d) { return hot(d) ? "var(--red)" : null; });
+
+      function place(t) {
+        var at25 = function (d) { var a = cur(d)[0], b = cur(d)[1]; return x(a + (b - a) * t); };
+        conn.attr("x1", function (d) { return x(cur(d)[0]); }).attr("x2", at25);
+        c14.attr("cx", function (d) { return x(cur(d)[0]); });
+        c25.attr("cx", at25);
+        // etichetta del 2014 a sinistra solo se il dato sale e c'è spazio; il 2025 sempre a destra del pallino più a destra
+        var leftOk = function (d) { return up(d) && x(cur(d)[0]) >= 34; };
+        l14.attr("x", function (d) { return x(cur(d)[0]) - 10; }).attr("text-anchor", "end")
+          .style("display", function (d) { return leftOk(d) ? null : "none"; }).text(function (d) { return fmt(cur(d)[0], 1); });
+        l25.attr("x", function (d) { return Math.max(at25(d), x(cur(d)[0])) + 11; }).attr("text-anchor", "start")
+          .html(function (d) { return fmt(cur(d)[1], 1) + (leftOk(d) ? "" : '<tspan class="val-label--muted"> da ' + fmt(cur(d)[0], 1) + "</tspan>"); });
+      }
+      if (phase === "pre" || phase === "play") {
+        place(0); l25.style("opacity", 0);
+        if (phase === "play") {
+          g.transition().duration(R.DUR).ease(R.EASE).tween("db", function () { return place; })
+            .on("end", function () { l25.transition().duration(200).style("opacity", 1); });
+        }
+      } else place(1);
+      R.enter(anno, phase === "play2" ? "static" : phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); });
+
+      g.append("g").selectAll("rect").data(data).join("rect").attr("class", "hit")
+        .attr("x", -labW).attr("width", W).attr("y", function (d) { return yOf(d) - row / 2; }).attr("height", row)
+        .on("pointerenter", function (ev, d) {
+          rowsG.classed("is-dimmed", function (q) { return q !== d; });
+          var v = cur(d), dd = v[1] - v[0];
+          tip.show(R.tipHTML({ title: (d.tot ? "Tutte le donne di 16-70 anni" : d.k + " anni") + " · " + sel.lab.toLowerCase(), value: f1(v[1]), unit: "nel 2025",
+            rows: [["Nel 2014", f1(v[0])], ["Variazione", (dd >= 0 ? "+" : "") + fmt(dd, 1) + " punti"]] }),
+            Math.min(x(Math.max(v[0], v[1])) + labW + 20, W - 20), yOf(d));
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); rowsG.classed("is-dimmed", false); } });
+      R.scheduleHeight();
+    }
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>
