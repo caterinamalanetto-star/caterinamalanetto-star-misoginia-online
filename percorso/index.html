@@ -9,13 +9,21 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
 <link rel="stylesheet" href="../assets/radar.css">
 <style>
-  .t-lab { font-size: 13px; font-weight: 600; fill: var(--ink); }
-  .t-desc { font-size: 13px; fill: var(--ink-2); }
-  .t-desc--ev { fill: var(--ink); }
-  .spine { stroke: var(--rule); stroke-width: 2; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 22px 0 8px; }
+  .step { border-top: 3px solid var(--blue); padding-top: 10px; }
+  .step--hot { border-top-color: var(--red); }
+  .step__num { font: 700 40px/1 var(--sans); letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .step__num small { font-size: 16px; font-weight: 600; letter-spacing: 0; margin-left: 4px; }
+  .step__time { font: 600 13px/1.3 var(--sans); color: var(--ink); margin-top: 6px; }
+  .step__txt { font: 400 13px/1.4 var(--sans); color: var(--ink-2); margin-top: 2px; }
+  .section-head { font: 700 15px/1.3 var(--sans); color: var(--ink); margin: 26px 0 2px; }
+  .section-sub { font: 400 13px/1.4 var(--sans); color: var(--ink-2); margin: 0 0 10px; }
+  .row-lab { font: 600 13px var(--sans); fill: var(--ink); }
+  .row-sub { font: 400 12px var(--sans); fill: var(--ink-2); }
   .track { fill: var(--grey-5); }
-  .ref line { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
-  .ref text { font-size: 12px; fill: var(--ink-2); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+  .sep { stroke: var(--rule); stroke-dasharray: 2 3; }
+  .in-label { font: 600 11px var(--sans); fill: #fff; }
+  @media (max-width: 519px) { .step__num { font-size: 32px; } }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="../assets/radar.js"></script>
@@ -24,14 +32,29 @@
 <main class="radar">
   <header>
     <h1 class="r-title">Dal calcio alla misoginia in 122 video</h1>
-    <p class="r-sub">Il percorso del profilo maschile nell'esperimento di ActionAid su Instagram, settembre 2026. Prima di ogni sessione da 50 video cercava una parola e metteva “mi piace” ai contenuti tossici. Quota di video tossici nel feed</p>
+    <p class="r-sub">L'esperimento di ActionAid su Instagram, settembre 2026. Un profilo maschile nuovo, 21 anni, cercava una parola prima di ogni sessione da 50 video e metteva “mi piace” ai contenuti tossici</p>
   </header>
 
-  <figure class="r-chart" id="tappe">
+  <div class="steps">
+    <div class="step">
+      <div class="step__num">15<small>video</small></div>
+      <div class="step__time">dopo 1 minuto e 25 secondi</div>
+      <div class="step__txt">Il primo contenuto tossico, sul mito del “vero uomo”. Aveva cercato solo “calcio”</div>
+    </div>
+    <div class="step step--hot">
+      <div class="step__num">122<small>video</small></div>
+      <div class="step__time">dopo 9 minuti e 45 secondi</div>
+      <div class="step__txt">Il primo contenuto apertamente misogino, dopo tre ricerche: “calcio”, “gaming”, “finanza”</div>
+    </div>
+  </div>
+
+  <p class="section-head">Poi il feed si riempie</p>
+  <p class="section-sub">Quota di video tossici nel feed, sessione per sessione</p>
+  <figure class="r-chart" id="bars" style="margin-top:0">
     <p class="r-key" id="key"></p>
   </figure>
 
-  <p class="r-note">Studio pilota, con un solo profilo per condizione. Sono tossici i contenuti che propongono modelli di genere rigidi, misoginia, antifemminismo o ideologie reazionarie collegate. Per le sessioni 1 e 5 il rapporto indica solo la quota totale di contenuti tossici. Il profilo maschile di controllo, che non cercava nulla e non metteva “mi piace”, in 350 video non ha ricevuto nessun contenuto misogino.</p>
+  <p class="r-note">Studio pilota, con un solo profilo per condizione. Sono tossici i contenuti che propongono modelli di genere rigidi, misoginia, antifemminismo o ideologie reazionarie collegate. Per le sessioni 2, 3 e 4 il rapporto non dà le percentuali, per le sessioni 1 e 5 dà solo la quota totale di contenuti tossici. Il profilo di controllo usava lo stesso telefono, senza ricerche né “mi piace”.</p>
 
   <footer class="r-foot">
     <span>Fonte: ActionAid, “Suggerito per te” (2026), audit su Instagram, 10-24 settembre 2026</span>
@@ -46,107 +69,78 @@
 
   R.loadCSV("../data/percorso-tappe.csv").then(function (rows) {
     var data = rows.map(function (r) {
-      return {
-        tipo: r["Tipo"], lab: r["Etichetta"], desc: r["Descrizione"],
-        n: R.num(r["Video nella sessione"]), tox: R.num(r["Contenuti tossici (%)"]),
-        mis: R.num(r["Misoginia e antifemminismo (%)"]), val: r["Valore mostrato"],
-        det: r["Dettaglio misoginia"] === "sì"
-      };
+      return { k: r["Riga"], lab: r["Etichetta"], q: r["Ricerca"], n: R.num(r["Video nella sessione"]),
+        tox: R.num(r["Contenuti tossici (%)"]), mis: R.num(r["Misoginia e antifemminismo (%)"]), val: r["Valore mostrato"], nota: r["Nota"] };
     });
-    var firstMis = data.filter(function (d) { return d.tipo === "evento"; })[1];
+    d3.select("#key").html('<span><i class="sw" style="background:var(--red)"></i>Misoginia e antifemminismo</span><span><i class="sw" style="background:var(--blue-3)"></i>Altri contenuti tossici</span><span><i class="sw" style="background:var(--grey-3)"></i>Profilo di controllo</span>');
 
-    d3.select("#key").html(
-      '<span><i class="sw" style="background:var(--red)"></i>Misoginia e antifemminismo</span>' +
-      '<span><i class="sw" style="background:var(--blue-3)"></i>Altri contenuti tossici</span>' +
-      '<span><i class="sw" style="background:var(--grey-3)"></i>Contenuti tossici, senza dettaglio</span>' +
-      '<span><i style="display:inline-block;width:0;height:12px;border-left:1px dashed var(--ink-2)"></i>Profilo di controllo: mai oltre il 10%</span>');
-
-    var host = document.getElementById("tappe");
+    var host = document.getElementById("bars");
     var tip = R.tooltip(host);
     R.dismissOutside(host, function () { tip.hide(); });
 
     R.responsive(host, function (W, phase) {
       var narrow = R.isNarrow(W);
-      var spineX = 7, textX = 24;
-      var labW = narrow ? W - textX : 250;          // colonna testo
-      var barX = narrow ? textX : textX + labW + 16;  // inizio barre
-      var right = 44;
-      var bw = W - barX - right;
+      var labW = narrow ? 0 : 190, right = narrow ? 4 : 112;
+      var bw = W - labW - right;
       var x = d3.scaleLinear().domain([0, 100]).range([0, bw]);
-      var bh = 16, rowGap = narrow ? 22 : 20, top = 26;
+      var bh = 18, rowH = narrow ? 52 : 44, top = 4, sepGap = 14;
+      var y = top;
+      data.forEach(function (d) { if (d.k === "Controllo") y += sepGap; d.y = y; y += rowH; });
+      var H = y - (narrow ? 8 : 14);
 
       d3.select(host).select("svg").remove();
-      var svg = d3.select(host).insert("svg", ".r-key").attr("width", W).attr("role", "img")
-        .attr("aria-label", "Percorso del profilo maschile attivo: primo contenuto tossico al video 15, primo contenuto misogino al video 122. Contenuti tossici: " +
-          data.filter(function (d) { return d.tipo === "sessione"; }).map(function (d) { return d.lab + " " + d.val; }).join(", ") + ".");
-      svg.append("title").text("Quota di contenuti tossici nel feed del profilo maschile attivo, sessione per sessione");
+      var svg = d3.select(host).insert("svg", ".r-key").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Quota di contenuti tossici nel feed del profilo maschile attivo: " + data.filter(function (d) { return d.k !== "Controllo"; }).map(function (d) { return d.lab + " " + d.val; }).join(", ") + ". Profilo di controllo: mai oltre il 10%.");
+      svg.append("title").text("Quota di contenuti tossici nel feed, sessione per sessione");
 
-      var spine = svg.append("line").attr("class", "spine").attr("x1", spineX).attr("x2", spineX);
-      var rowsG = svg.append("g");
-      var y = top, items = [];
+      var ctrl = data.find(function (d) { return d.k === "Controllo"; });
+      svg.append("line").attr("class", "sep").attr("x1", 0).attr("x2", W).attr("y1", ctrl.y - sepGap / 2 - 4).attr("y2", ctrl.y - sepGap / 2 - 4);
 
-      data.forEach(function (d) {
-        var g = rowsG.append("g").attr("class", "mark");
-        var ev = d.tipo === "evento";
-        var lab = g.append("text").attr("class", "t-lab").attr("x", textX).attr("y", y).attr("dy", "0.35em").text(d.lab);
-        R.wrap(lab, ev ? W - textX : labW, 1.3);
-        var lh = (+lab.attr("data-lines")) * 13 * 1.3;
-        var desc = g.append("text").attr("class", "t-desc" + (ev ? " t-desc--ev" : "")).attr("x", textX).attr("y", y + lh).attr("dy", "0.35em").text(d.desc);
-        R.wrap(desc, ev ? Math.min(W - textX, 560) : labW, 1.3);
-        var dh = (+desc.attr("data-lines")) * 13 * 1.3;
-        var textH = lh + dh;
-        var dot = g.append("circle").attr("cx", spineX).attr("cy", y)
-          .style("fill", ev ? (d === firstMis ? "var(--red)" : "var(--blue)") : "var(--grey-3)")
-          .style("stroke", "var(--bg)").style("stroke-width", 2);
-        R.enter(dot, phase, function (s) { s.attr("r", 0); }, function (s) { s.attr("r", ev ? 7 : 4); }, R.DUR * 0.6);
-
-        var rowH = textH, by = null;
-        if (!ev) {
-          by = narrow ? y + textH + 2 : y - bh / 2 + 4;
-          if (narrow) rowH = textH + bh + 4; else rowH = Math.max(textH, bh);
-          g.append("rect").attr("class", "track").attr("x", barX).attr("y", by).attr("width", bw).attr("height", bh).attr("rx", 2);
-          var redP = g.append("path").style("fill", "var(--red)");
-          var bluP = g.append("path").style("fill", d.det ? "var(--blue-3)" : "var(--grey-3)");
-          var setBars = function (t) {
-            var m = d.det ? x(d.mis) : 0;
-            redP.attr("d", m > 0 ? R.barPathH(barX, by, m * t, bh, 0) : null);
-            var a = m > 0 ? m + 2 : 0;
-            bluP.attr("d", R.barPathH(barX + a * t, by, Math.max(0, x(d.tox) - a) * t, bh, 2));
-          };
-          if (phase === "static") setBars(1);
-          else { setBars(0); if (phase === "play") g.transition().duration(R.DUR).ease(R.EASE).tween("b", function () { return setBars; }); }
-          g.append("text").attr("class", "val-label").attr("x", barX + x(d.tox) + 6).attr("y", by + bh / 2).attr("dy", "0.35em").text(d.val);
+      var rowsG = svg.selectAll("g.row").data(data).join("g").attr("class", "row mark");
+      rowsG.each(function (d) {
+        var g = d3.select(this);
+        var by = narrow ? d.y + 20 : d.y + 4;
+        d.by = by;
+        var sub = d.k === "Controllo" || d.k === "Tre giorni dopo" ? d.q : "cerca " + d.q;
+        if (narrow) {
+          var t = g.append("text").attr("class", "row-lab").attr("x", 0).attr("y", d.y + 6).attr("dy", "0.35em");
+          t.append("tspan").text(d.lab);
+          t.append("tspan").attr("class", "row-sub").attr("dx", 6).text(sub);
+        } else {
+          g.append("text").attr("class", "row-lab").attr("x", 0).attr("y", by + bh / 2 - 7).attr("dy", "0.35em").text(d.lab);
+          g.append("text").attr("class", "row-sub").attr("x", 0).attr("y", by + bh / 2 + 9).attr("dy", "0.35em").text(sub);
         }
-        items.push({ d: d, g: g, y0: y - 10, h: rowH + 12, by: by });
-        y += rowH + rowGap;
+        var bx = labW;
+        g.append("rect").attr("class", "track").attr("x", bx).attr("y", by).attr("width", bw).attr("height", bh).attr("rx", 2);
+        var isC = d.k === "Controllo";
+        var red = g.append("path").style("fill", "var(--red)");
+        var blu = g.append("path").style("fill", isC ? "var(--grey-3)" : "var(--blue-3)");
+        function set(t) {
+          var m = d.mis > 0 ? x(d.mis) : 0;
+          red.attr("d", m > 0 ? R.barPathH(bx, by, m * t, bh, 0) : null);
+          var a = m > 0 ? m + 2 : 0;
+          blu.attr("d", R.barPathH(bx + a * t, by, Math.max(0, x(d.tox) - a) * t, bh, 2));
+        }
+        if (phase === "static") set(1); else { set(0); if (phase === "play") g.transition().duration(R.DUR).ease(R.EASE).tween("b", function () { return set; }); }
+        if (d.mis > 0 && x(d.mis) > 34) g.append("text").attr("class", "in-label").attr("x", bx + 6).attr("y", by + bh / 2).attr("dy", "0.35em").text(pc(d.mis));
+        var vt = g.append("text").attr("class", "val-label").attr("y", by + bh / 2).attr("dy", "0.35em").text(d.val);
+        var vw = vt.node().getComputedTextLength();
+        if (bx + x(d.tox) + 6 + vw > W) vt.attr("x", bx + x(d.tox) - 6).attr("text-anchor", "end").style("fill", "#fff");
+        else vt.attr("x", bx + x(d.tox) + 6);
       });
 
-      var H = y - rowGap + 14;
-      spine.attr("y1", top).attr("y2", items[items.length - 1].y0 + 10);
-
-      // riferimento: profilo di controllo mai oltre il 10%, un trattino su ogni barra
-      var ref = svg.append("g").attr("class", "ref");
-      items.filter(function (it) { return it.by !== null; }).forEach(function (it) {
-        ref.append("line").attr("x1", barX + x(10) + 0.5).attr("x2", barX + x(10) + 0.5).attr("y1", it.by - 4).attr("y2", it.by + bh + 4);
-      });
-      svg.attr("height", H);
-
-      // tooltip
-      svg.append("g").selectAll("rect").data(items).join("rect").attr("class", "hit")
-        .attr("x", 0).attr("width", W).attr("y", function (it) { return it.y0; }).attr("height", function (it) { return it.h; })
-        .on("pointerenter pointermove", function (ev, it) {
-          items.forEach(function (o) { o.g.classed("is-dimmed", o !== it); });
-          var d = it.d, p = d3.pointer(ev, host);
-          var html = d.tipo === "evento"
-            ? R.tipHTML({ title: d.lab, value: d === firstMis ? "Misoginia" : "Tossico", rows: [], note: d.desc })
-            : R.tipHTML({ title: d.lab, value: pc(d.tox), unit: "contenuti tossici",
-                rows: d.det ? [["Misoginia e antifemminismo", pc(d.mis)], ["Video della sessione", d.n]] : [["Video della sessione", d.n]],
-                note: d.det ? d.desc : d.desc + ". Il rapporto non indica la quota di misoginia" });
-          tip.show(html, p[0], it.y0 + it.h);
+      svg.append("g").selectAll("rect").data(data).join("rect").attr("class", "hit")
+        .attr("x", 0).attr("width", W).attr("y", function (d) { return d.y - 4; }).attr("height", rowH)
+        .on("pointerenter pointermove", function (ev, d) {
+          rowsG.classed("is-dimmed", function (q) { return q !== d; });
+          var p = d3.pointer(ev, host);
+          var rows2 = [["Video", d.n]];
+          if (d.mis > 0) rows2.unshift(["di cui misoginia e antifemminismo", pc(d.mis)]);
+          tip.show(R.tipHTML({ title: d.lab + (d.k === "Controllo" ? "" : " · " + d.q), value: d.k === "Controllo" ? "max 10%" : pc(d.tox), unit: "contenuti tossici", rows: rows2, note: d.nota }), p[0], d.by + bh);
         })
-        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); items.forEach(function (o) { o.g.classed("is-dimmed", false); }); } });
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); rowsG.classed("is-dimmed", false); } });
     });
-  }).catch(function (e) { R.fail("#tappe", e); });
+  }).catch(function (e) { R.fail("#bars", e); });
 })();
 </script>
 </body>
