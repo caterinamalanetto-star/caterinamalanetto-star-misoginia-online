@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Più ci si allontana dal centro, più la voce si abbassa – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .ring { fill: none; stroke: var(--rule); stroke-width: 1; }
+  .r-name { font: 700 14px var(--sans); fill: var(--ink); }
+  .r-meta { font: 400 12px var(--sans); fill: var(--ink-2); }
+  .leader { stroke: var(--ink-2); stroke-width: .75; fill: none; }
+  .leader-dot { fill: var(--ink-2); }
+  .rings-list { list-style: none; margin: 14px 0 0; padding: 0; }
+  .rings-list li { padding: 8px 0; border-top: 1px solid var(--rule); font: 400 13px/1.4 var(--sans); color: var(--ink-2); cursor: pointer; transition: opacity 180ms ease; }
+  .rings-list li:first-child { border-top: 0; }
+  .rings-list b { color: var(--ink); font-weight: 700; }
+  .rings-list li.is-dimmed { opacity: .35; }
+  .caption { font: 400 14px/1.45 var(--sans); color: var(--ink); margin: 16px 0 0; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Più ci si allontana dal centro, più la voce si abbassa</h1>
+    <p class="r-sub">I 100 profili Instagram della rete mappata da ActionAid a giugno 2026, dal nucleo della manosfera ai profili “ponte” verso il grande pubblico. Un punto per profilo, colorato secondo il tono prevalente</p>
+  </header>
+
+  <figure class="r-chart" id="chart">
+    <ul class="rings-list" id="rings-list"></ul>
+    <p class="r-key" id="key"></p>
+    <p class="caption" id="caption"></p>
+  </figure>
+
+  <p class="r-note">Nucleo: profili dedicati in prevalenza ai temi della manosfera. Periferia: lifestyle, dating, fitness e crescita personale, con il discorso di genere in una parte dei contenuti. Ponti: media, podcast e pagine generaliste che ogni tanto ospitano o rilanciano questi contenuti. Il rapporto indica il tono per tipo di profilo solo in parte: i divulgativi del nucleo sono calcolati per differenza, gli altri toni sono in grigio. La classificazione descrive i contenuti pubblici osservati, non le convinzioni di chi li pubblica.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: ActionAid, “Suggerito per te” (2026), tabelle 3 e 5 e capitolo 1</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar;
+  var GOLD = Math.PI * (3 - Math.sqrt(5));
+  var PL = { Aggressivo: "aggressivi", Divulgativo: "divulgativi", Ironico: "ironici", Aspirazionale: "aspirazionali" };
+  var ORDER = ["Aggressivo", "Divulgativo", "Ironico", "Aspirazionale", "Altri toni"];
+
+  R.loadCSV("../data/rete-manosfera.csv").then(function (rows) {
+    var rings = [];
+    rows.forEach(function (r) {
+      var g = rings.find(function (q) { return q.k === r["Anello"]; });
+      if (!g) { g = { k: r["Anello"], n: R.num(r["Profili"]), fol: r["Follower"], tones: [] }; rings.push(g); }
+      g.tones.push({ t: r["Tono"], n: R.num(r["Profili con questo tono"]), col: "var(--" + r["Colore"] + ")", nota: r["Nota"] });
+    });
+    rings.forEach(function (g) { g.tones.sort(function (a, b) { return ORDER.indexOf(a.t) - ORDER.indexOf(b.t); }); });
+
+    var tones = [];
+    rings.forEach(function (g) { g.tones.forEach(function (t) { if (!tones.find(function (q) { return q.t === t.t; })) tones.push(t); }); });
+    tones.sort(function (a, b) { return ORDER.indexOf(a.t) - ORDER.indexOf(b.t); });
+    d3.select("#key").html(tones.map(function (t) { return '<span><i class="sw" style="background:' + t.col + '"></i>' + (t.t === "Altri toni" ? "Altri toni, non distinti per tipo" : t.t) + '</span>'; }).join(""));
+
+    var nuc = rings[0], pon = rings[rings.length - 1];
+    var aggr = nuc.tones.find(function (t) { return t.t === "Aggressivo"; });
+    var pDiv = pon.tones.find(function (t) { return t.t === "Divulgativo"; }), pIro = pon.tones.find(function (t) { return t.t === "Ironico"; });
+    d3.select("#caption").text("Tutti e " + aggr.n + " i profili dal tono apertamente aggressivo stanno nel nucleo. Tra i ponti, i più seguiti, " + pDiv.n + " su " + pon.n + " parlano con tono divulgativo e " + pIro.n + " con l'ironia.");
+
+    var dots = [];
+    rings.forEach(function (g) { g.tones.forEach(function (t) { for (var j = 0; j < t.n; j++) dots.push({ g: g, t: t }); }); });
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var circles, ringSel, listLi, labels;
+    function hi(g) {
+      [circles, labels].forEach(function (s) { if (s) s.classed("is-dimmed", function (d) { return (d.g || d) !== g; }); });
+      if (listLi) listLi.classed("is-dimmed", function (d) { return d !== g; });
+      if (ringSel) ringSel.classed("is-dimmed", function (d) { return d !== g; });
+    }
+    function unhi() { [circles, listLi, ringSel, labels].forEach(function (s) { if (s) s.classed("is-dimmed", false); }); }
+    R.dismissOutside(host, function () { tip.hide(); unhi(); });
+
+    listLi = d3.select("#rings-list").selectAll("li").data(rings).join("li")
+      .html(function (g) { return "<b>" + g.k + "</b> · " + g.n + " profili. Tono: " + g.tones.filter(function (t) { return t.t !== "Altri toni"; }).map(function (t) { return t.n + " " + PL[t.t]; }).join(", ") + (g.fol ? ". Follower: " + g.fol : ""); })
+      .on("pointerenter click", function (ev, g) { hi(g); })
+      .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") unhi(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      d3.select("#rings-list").style("display", narrow ? null : "none");
+      var D = narrow ? Math.min(W, 360) : 420;
+      var labX = D + 28, labW = W - labX;
+      var cx = narrow ? W / 2 : D / 2, cy = D / 2;
+      var dotR = Math.max(4, D / 60);
+      var R3 = D / 2 - dotR - 4;
+      var R1 = R3 * 0.47, R2in = R1 + dotR * 2.6, R2out = R3 * 0.78;
+
+      function sunflower(n, r0, r1) {
+        var pts = [];
+        for (var i = 0; i < n; i++) {
+          var f = (i + 0.5) / n;
+          pts.push({ r: Math.sqrt(r0 * r0 + (r1 * r1 - r0 * r0) * f), a: i * GOLD });
+        }
+        return pts;
+      }
+      var byRing = rings.map(function (g) { return dots.filter(function (d) { return d.g === g; }); });
+      sunflower(byRing[0].length, 0, R1 - dotR * 1.3).forEach(function (p, i) { byRing[0][i].p = p; });
+      var pp = sunflower(byRing[1].length, R2in, R2out).map(function (p) { p.a = ((p.a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI); return p; })
+        .sort(function (a, b) { return a.a - b.a; });
+      pp.forEach(function (p, i) { p.a -= Math.PI / 2; byRing[1][i].p = p; });
+      byRing[2].forEach(function (d, i) { d.p = { r: R3, a: -Math.PI / 2 + (i + 0.5) * 2 * Math.PI / byRing[2].length }; });
+      dots.forEach(function (d) { d.x = cx + d.p.r * Math.cos(d.p.a); d.y = cy + d.p.r * Math.sin(d.p.a); });
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".rings-list").attr("width", W).attr("height", D).attr("role", "img")
+        .attr("aria-label", rings.map(function (g) { return g.k + ": " + g.n + " profili, " + g.tones.map(function (t) { return t.t.toLowerCase() + " " + t.n; }).join(", "); }).join(". ") + ".");
+      svg.append("title").text("La rete della manosfera su Instagram per tipo di profilo e tono");
+
+      var radii = [R1, (R2out + R3) / 2, R3 + dotR + 3];
+      ringSel = svg.append("g").selectAll("circle").data(rings).join("circle").attr("class", "ring mark").attr("cx", cx).attr("cy", cy);
+      R.enter(ringSel, phase, function (s) { s.attr("r", 0); }, function (s) { s.attr("r", function (g, i) { return radii[i]; }); });
+
+      circles = svg.append("g").selectAll("circle").data(dots).join("circle").attr("class", "mark")
+        .attr("r", dotR).style("fill", function (d) { return d.t.col; }).style("stroke", "var(--bg)").style("stroke-width", 1);
+      R.enter(circles, phase, function (s) { s.attr("cx", cx).attr("cy", cy); }, function (s) { s.attr("cx", function (d) { return d.x; }).attr("cy", function (d) { return d.y; }); }, R.DUR * 1.4);
+
+      labels = null;
+      if (!narrow) {
+        var ty = [cy + D * 0.06, cy - D * 0.2, cy - D * 0.43];
+        var ang = [0.12, -0.3, -0.62];
+        labels = svg.append("g").selectAll("g").data(rings).join("g").attr("class", "mark");
+        labels.each(function (g, i) {
+          var gg = d3.select(this);
+          var r = i === 0 ? R1 * 0.75 : (i === 1 ? R2out : R3);
+          var ax = cx + r * Math.cos(ang[i]), ay = cy + r * Math.sin(ang[i]);
+          gg.append("path").attr("class", "leader").attr("d", "M" + ax + "," + ay + " L" + (labX - 8) + "," + ty[i]);
+          gg.append("circle").attr("class", "leader-dot").attr("cx", ax).attr("cy", ay).attr("r", 2);
+          gg.append("text").attr("class", "r-name").attr("x", labX).attr("y", ty[i]).attr("dy", "0.35em").text(g.k + ", " + g.n + " profili");
+          var meta = gg.append("text").attr("class", "r-meta").attr("x", labX).attr("y", ty[i] + 18).attr("dy", "0.35em")
+            .text("Tono: " + g.tones.filter(function (t) { return t.t !== "Altri toni"; }).map(function (t) { return t.n + " " + PL[t.t]; }).join(", ") + (g.fol ? ". Follower: " + g.fol : ""));
+          R.wrap(meta, labW - 4, 1.35);
+        });
+        labels.on("pointerenter", function (ev, g) { hi(g); }).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") unhi(); });
+        R.enter(labels, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); });
+      }
+
+      svg.append("g").selectAll("circle").data(dots).join("circle").attr("class", "hit")
+        .attr("cx", function (d) { return d.x; }).attr("cy", function (d) { return d.y; }).attr("r", dotR * 1.5)
+        .on("pointerenter", function (ev, d) {
+          hi(d.g);
+          circles.classed("is-dimmed", function (q) { return !(q.g === d.g && q.t === d.t); });
+          var p = d3.pointer(ev, host);
+          tip.show(R.tipHTML({ title: d.g.k + " · " + d.t.t, value: d.t.n, unit: "profili su " + d.g.n, rows: [], note: d.t.nota || null }), p[0], p[1]);
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); unhi(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>

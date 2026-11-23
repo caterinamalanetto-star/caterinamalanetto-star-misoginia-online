@@ -1,0 +1,10 @@
+Anello;Profili;Follower;Tono;Profili con questo tono;Colore;Nota
+Nucleo;49;al massimo circa 200mila;Aggressivo;6;red;Tutti i profili dal tono apertamente aggressivo sono nel nucleo
+Nucleo;49;al massimo circa 200mila;Divulgativo;10;blue-1;Calcolato: 31 divulgativi in tutto, meno 13 della periferia e 8 dei ponti
+Nucleo;49;al massimo circa 200mila;Altri toni;33;grey-4;Coaching, ironico, militante, aspirazionale: il rapporto non indica la divisione per tipo di profilo
+Periferia;37;;Divulgativo;13;blue-1;
+Periferia;37;;Aspirazionale;11;blue-3;
+Periferia;37;;Altri toni;13;grey-4;Coaching, ironico, militante: il rapporto non indica la divisione per tipo di profilo
+Ponti;14;alcuni oltre 2 milioni;Divulgativo;8;blue-1;
+Ponti;14;alcuni oltre 2 milioni;Ironico;3;blue-4;
+Ponti;14;alcuni oltre 2 milioni;Altri toni;3;grey-4;Il rapporto non indica quali

@@ -4,6 +4,7 @@ Pagine pubblicate su GitHub Pages. Ogni grafico legge i propri dati in `data/`: 
 
 - **Dal calcio alla misoginia in 122 video**: https://caterinamalanetto-star.github.io/caterinamalanetto-star-misoginia-online/percorso/
 - **Stessa parola, due feed diversi**: https://caterinamalanetto-star.github.io/caterinamalanetto-star-misoginia-online/feed-dating/
+- **Più ci si allontana dal centro, più la voce si abbassa**: https://caterinamalanetto-star.github.io/caterinamalanetto-star-misoginia-online/rete-manosfera/
 - **Violenza sulle donne per età, 2014 e 2025**: https://caterinamalanetto-star.github.io/caterinamalanetto-star-misoginia-online/violenza-eta/
 - **Violenza sessuale per area geografica, 2014 e 2025**: https://caterinamalanetto-star.github.io/caterinamalanetto-star-misoginia-online/mappa-aree/
 - **Prova a indovinare**: https://caterinamalanetto-star.github.io/caterinamalanetto-star-misoginia-online/indovina/
@@ -19,3 +20,4 @@ Pagine pubblicate su GitHub Pages. Ogni grafico legge i propri dati in `data/`: 
 ## Snippet per il CMS
 
 Vedi `index.html`: per ogni dataviz c'è l'iframe con lo script inline. Se ci sono più dataviz nello stesso articolo, lo script può restare in ognuna (il controllo `__radarQNv2` evita doppioni).
+- `data/rete-manosfera.csv`: ActionAid, “Suggerito per te” (2026), tabelle 3 e 5 e capitolo 1. Divulgativi del nucleo calcolati per differenza (31 − 13 periferia − 8 ponti). Gli altri toni non sono distinti per tipo di profilo nel rapporto.
