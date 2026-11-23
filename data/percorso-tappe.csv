@@ -1,0 +1,8 @@
+Tappa;Tipo;Etichetta;Descrizione;Video nella sessione;Contenuti tossici (%);Misoginia e antifemminismo (%);Valore mostrato;Dettaglio misoginia
+1;evento;Video 15, dopo 1 min 25 s;Il primo contenuto tossico: il mito del “vero uomo”. Il profilo aveva cercato solo “calcio” e messo cinque “mi piace”;;;;;
+2;sessione;Sessione 1, cerca “calcio”;Un video su sette è tossico;50;14,3;;1 su 7;no
+3;evento;Video 122, dopo 9 min 45 s;Il primo contenuto apertamente misogino, dopo tre ricerche: “calcio”, “gaming”, “finanza”;;;;;
+4;sessione;Sessione 5, cerca “palestra”;Il 38% dei video è tossico;50;38;;38%;no
+5;sessione;Sessione 6, cerca “dating”;41 video tossici su 50, 15 misogini;50;82;30;82%;sì
+6;sessione;Sessione 7, cerca “salute mentale maschile”;47 video tossici su 50, 23 misogini;50;94;46;94%;sì
+7;sessione;Tre giorni dopo, senza cercare nulla;27 video tossici su 30, 17 misogini;30;90;57;90%;sì
